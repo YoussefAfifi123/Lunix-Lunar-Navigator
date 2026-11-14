@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lunar Site Navigator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'SF Mono', 'Menlo', 'monospace'],
+          },
+          colors: {
+            canvas: '#090d16',
+            card: '#111726',
+            subcard: '#0d1320',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root { color-scheme: dark; }
+    body { background-color: #090d16; color: #e2e8f0; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+    .subtle-border { border: 1px solid rgba(255, 255, 255, 0.07); }
+    .subtle-border-b { border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+    .subtle-border-t { border-top: 1px solid rgba(255, 255, 255, 0.07); }
+    
+    /* Range Slider */
+    input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+    input[type="range"]::-webkit-slider-runnable-track { background: rgba(255, 255, 255, 0.1); height: 5px; border-radius: 999px; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; margin-top: -5px; background-color: #38bdf8; height: 15px; width: 15px; border-radius: 999px; border: 2px solid #090d16; transition: transform 0.12s ease; }
+    input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.12); }
+    
+    /* Details arrow reset */
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    details[open] .chevron-icon { transform: rotate(180deg); }
+
+    /* =========================================================================
+       CUSTOM HELP ICON & TOOLTIP ENGINE
+       Tooltips ONLY appear when hovering the '?' icon itself.
+       ========================================================================= */
+    .help-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      color: #94a3b8;
+      font-size: 10px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      cursor: help;
+      position: relative;
+      margin-left: 6px;
+      transition: background 0.15s ease, color 0.15s ease;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+    
+    .help-icon:hover {
+      background: #38bdf8;
+      color: #0f172a;
+    }
+
+    .help-icon::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: max-content;
+      max-width: 240px;
+      padding: 8px 12px;
+      background-color: #1e293b;
+      color: #f1f5f9;
+      font-size: 11px;
+      line-height: 1.5;
+      font-weight: 400;
+      text-align: left;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+      z-index: 100;
+      pointer-events: none;
+      white-space: normal;
+    }
+
+    /* Tooltip Arrow */
+    .help-icon::before {
+      content: '';
+      position: absolute;
+      bottom: calc(100% + 3px);
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 5px;
+      border-style: solid;
+      border-color: #334155 transparent transparent transparent;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+      z-index: 101;
+      pointer-events: none;
+    }
+
+    .help-icon:hover::after,
+    .help-icon:hover::before {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    /* Position Modifiers */
+    .help-icon.tip-right::after { left: auto; right: -10px; transform: none; }
+    .help-icon.tip-right::before { left: auto; right: 2px; transform: none; }
+    
+    .help-icon.tip-left::after { left: -10px; transform: none; }
+    .help-icon.tip-left::before { left: 2px; transform: none; }
+    
+    .help-icon.tip-down::after { bottom: auto; top: calc(100% + 8px); }
+    .help-icon.tip-down::before { bottom: auto; top: calc(100% + 3px); border-color: transparent transparent #334155 transparent; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-sky-500/20 selection:text-sky-200">
+
+  <!-- ==================== MINIMALIST TOP BAR ==================== -->
+  <header class="sticky top-0 z-30 bg-canvas/90 backdrop-blur-md subtle-border-b">
+    <div class="max-w-[1400px] mx-auto px-4 md:px-6 h-auto md:h-16 py-3 md:py-0 flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Brand -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-white/[0.04] subtle-border flex items-center justify-center text-amber-300">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </div>
+        <span class="font-semibold text-base tracking-tight text-slate-100">Lunar Site Navigator</span>
+      </div>
+
+      <!-- Time Controls -->
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 bg-card px-2.5 py-1.5 rounded-xl subtle-border">
+          <input type="datetime-local" id="dt" step="3600" aria-label="Target UTC Time" class="bg-transparent text-slate-200 font-mono text-xs focus:outline-none px-1.5 py-0.5">
+          <div class="h-4 w-[1px] bg-white/10"></div>
+          <button id="playBtn" class="px-3 py-1 rounded-lg text-xs font-medium bg-white/[0.06] hover:bg-white/[0.12] text-slate-100 transition-colors min-w-[72px] text-center">▶ Play</button>
+          <select id="speedSelect" class="bg-transparent text-slate-400 hover:text-slate-200 font-mono text-xs focus:outline-none cursor-pointer pr-1">
+            <option value="1" class="bg-card text-slate-200">1× (1h/s)</option>
+            <option value="6" class="bg-card text-slate-200">6× (6h/s)</option>
+            <option value="24" selected class="bg-card text-slate-200">24× (1d/s)</option>
+            <option value="168" class="bg-card text-slate-200">168× (7d/s)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- View Actions & Persona -->
+      <div class="flex items-center gap-3">
+        <!-- Persona Toggle -->
+        <div class="flex items-center gap-1">
+          <div class="flex items-center bg-card p-1 rounded-xl subtle-border" id="personaToggle">
+            <button data-persona="engineer" class="px-3 py-1.5 text-xs rounded-lg font-medium bg-white/[0.12] text-slate-100 transition-colors">Engineer</button>
+            <button data-persona="explorer" class="px-3 py-1.5 text-xs rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-colors">Explorer</button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1">
+          <button id="compareBtn" class="px-3.5 py-2 md:py-1.5 rounded-xl text-xs font-medium bg-card hover:bg-white/[0.06] text-slate-300 subtle-border transition-colors flex items-center gap-2">
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7"/></svg>
+            <span class="hidden md:inline">Compare Sites</span>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-1">
+          <button id="shareBtn" class="px-3.5 py-2 md:py-1.5 rounded-xl text-xs font-medium bg-card hover:bg-white/[0.06] text-slate-300 subtle-border transition-colors">Share</button>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ==================== MAIN WORKSPACE ==================== -->
+  <main class="flex-1 max-w-[1400px] w-full mx-auto px-4 md:px-6 py-6 space-y-6">
+
+    <!-- ==================== MISSION ADJUSTMENTS DRAWER ==================== -->
+    <details id="adjustmentsDrawer" class="bg-card rounded-2xl subtle-border group">
+      <summary class="px-5 py-3 cursor-pointer flex items-center justify-between text-xs text-slate-400 hover:text-slate-200 transition-colors select-none" style="display: flex;">
+        <div class="flex items-center gap-3">
+          <span class="font-medium text-slate-300">Mission Adjustments &amp; NASA Tools</span>
+          <span class="text-slate-500 hidden sm:inline ml-2">Launch delay slip, reset time, LROC QuickMap &amp; JPL Horizons verification</span>
+          <span id="slipActiveBadge" class="hidden px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 font-mono text-[11px]"></span>
+        </div>
+        <svg class="chevron-icon w-4 h-4 text-slate-500 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </summary>
+
+      <div class="px-5 py-4 subtle-border-t bg-subcard/60 flex flex-wrap items-center justify-between gap-6 text-xs rounded-b-2xl">
+        
+        <!-- Launch Slip Control -->
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center text-slate-400 font-medium">
+            Launch Delay (Slip):
+          </div>
+          <input type="range" id="slipSlider" min="0" max="30" step="1" value="0" class="w-28">
+          <div class="flex items-center gap-1 bg-card p-1 rounded-lg subtle-border" id="slipSeg">
+            <button data-slip="0" class="px-2 py-0.5 rounded text-[11px] font-mono bg-white/10 text-white">0d</button>
+            <button data-slip="1" class="px-2 py-0.5 rounded text-[11px] font-mono text-slate-400 hover:text-slate-200">+1d</button>
+            <button data-slip="3" class="px-2 py-0.5 rounded text-[11px] font-mono text-slate-400 hover:text-slate-200">+3d</button>
+            <button data-slip="7" class="px-2 py-0.5 rounded text-[11px] font-mono text-slate-400 hover:text-slate-200">+7d</button>
+            <button data-slip="14" class="px-2 py-0.5 rounded text-[11px] font-mono text-slate-400 hover:text-slate-200">+14d</button>
+          </div>
+          <span id="effectiveDtLbl" class="font-mono text-slate-400 text-[11px]">No delay</span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center">
+            <button id="nowBtn" class="px-3 py-1.5 rounded-lg bg-card hover:bg-white/[0.06] text-slate-300 subtle-border transition-colors">Reset to Current UTC</button>
+          </div>
+          <div class="flex items-center">
+            <a id="globalQmLink" href="#" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg bg-card hover:bg-white/[0.06] text-sky-300 subtle-border transition-colors">ASU LROC QuickMap ↗</a>
+          </div>
+          <div class="flex items-center">
+            <a id="globalJplLink" href="#" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg bg-card hover:bg-white/[0.06] text-slate-300 subtle-border transition-colors">Verify JPL Horizons ↗</a>
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <!-- ==================== PRIMARY SITE WORKSPACE ==================== -->
+    <div id="root" class="space-y-6"></div>
+
+  </main>
+
+<script>
+"use strict";
+
+/* =========================================================================
+   MATH CONSTANTS
+   ========================================================================= */
+const DEG = Math.PI / 180;
+const RAD = 180 / Math.PI;
+const norm360 = x => ((x % 360) + 360) % 360;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const SOLAR_RADIUS = 0.266; //Half of the sun's ~0.53 angular diameter
+
+/* ---------- 1. Time & Ephemeris Helpers ---------- */
+function julianDay(date) { return date.getTime() / 86400000 + 2440587.5; }
+function jdToMs(jd) { return (jd - 2440587.5) * 86400000; }
+function jdToDate(jd) { return new Date(jdToMs(jd)); }
+function centuries(jd) { return (jd - 2451545) / 36525; }
+
+function sunEclipticLon(jd) {
+  const T = centuries(jd);
+  const L0 = norm360(280.46646 + 36000.76983 * T);
+  const M  = norm360(357.52911 + 35999.05029 * T - 0.0001537 * T * T);
+  const Mr = M * DEG;
+  return norm360(L0 + (1.914602 - 0.004817 * T) * Math.sin(Mr) + (0.019993 - 0.000101 * T) * Math.sin(2 * Mr) + 0.000289 * Math.sin(3 * Mr));
+}
+
+function moonMeanLong(jd) { const T = centuries(jd); return norm360(218.31617 + 481267.88088 * T - 0.0013978 * T * T); }
+function moonMeanAnom(jd) { const T = centuries(jd); return norm360(134.9633964 + 477198.8675055 * T); }
+function moonArgLat(jd)   { const T = centuries(jd); return norm360(93.2720950 + 483202.0175233 * T); }
+function moonAscNode(jd)  { const T = centuries(jd); return norm360(125.04452 - 1934.136261 * T + 0.0020708 * T * T); }
+
+function moonEclipticLon(jd) {
+  const T = centuries(jd);
+  const Lp = moonMeanLong(jd);
+  const Mp = moonMeanAnom(jd) * DEG;
+  const M = norm360(357.52911 + 35999.05029 * T) * DEG // Sun's mean anomaly 
+  const Dr  = (Lp - sunEclipticLon(jd)) * DEG;
+  return norm360(
+    Lp
+     + 6.289 * Math.sin(Mp)
+     + 1.274 * Math.sin(2*Dr - Mp)
+     - 0.658 * Math.sin(2 * Dr) 
+     - 0.186 * Math.sin(M)
+    );
+}
+
+function subsolarPoint(jd) {
+  const sunL = sunEclipticLon(jd), moonL = moonEclipticLon(jd), Omega = moonAscNode(jd);
+  return { lat: 1.54 * Math.sin((sunL - Omega) * DEG), lon: norm360(sunL - moonL + 180) };
+}
+
+function subearthPoint(jd) {
+  const Mp = moonMeanAnom(jd) * DEG, F = moonArgLat(jd) * DEG;
+  return { lat: 6.80 * Math.sin(F) + 1.30 * Math.sin(2 * F), lon: 7.90 * Math.sin(Mp) - 1.00 * Math.sin(2 * Mp) };
+}
+
+function bodyAltAz(siteLat, siteLon, bodyLat, bodyLon) {
+  const phi = siteLat * DEG, lam = siteLon * DEG, d = bodyLat * DEG, bl = bodyLon * DEG;
+  const bx = Math.cos(d) * Math.cos(bl), by = Math.cos(d) * Math.sin(bl), bz = Math.sin(d);
+  const Ux = Math.cos(phi) * Math.cos(lam), Uy = Math.cos(phi) * Math.sin(lam), Uz = Math.sin(phi);
+  const Ex = -Math.sin(lam), Ey = Math.cos(lam);
+  const Nx = -Math.sin(phi) * Math.cos(lam), Ny = -Math.sin(phi) * Math.sin(lam), Nz = Math.cos(phi);
+  const e = bx * Ex + by * Ey;
+  const n = bx * Nx + by * Ny + bz * Nz;
+  const u = bx * Ux + by * Uy + bz * Uz;
+  return { alt: Math.asin(clamp(u, -1, 1)) * RAD, az: norm360(Math.atan2(e, n) * RAD) };
+}
+
+/* ---------- 2. Sites & Horizon Profiles ---------- */
+function seededRandom(seed) {
+  let s = seed | 0 || 1;
+  return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+}
+
+function generateHorizon(site) {
+  const t = site.terrain || 'mare';
+  const cfg = ({
+    peak: { base: 0.4, amp: 2.6, npeak: 3 }, rim: { base: 1.4, amp: 8.2, npeak: 6 },
+    crater: { base: 2.8, amp: 13.0, npeak: 7 }, mare: { base: 0.6, amp: 2.0, npeak: 2 },
+  })[t];
+  const seed = Math.floor(Math.abs(site.lat * 1000) + Math.abs(site.lon) * 100 + site.name.length * 97 + 13);
+  const rand = seededRandom(seed);
+  const peaks = Array.from({length: cfg.npeak}, () => ({az: rand() * 360, h: cfg.amp * (0.5 + rand() * 0.9), w: 8 + rand() * 32}));
+  const prof = new Array(360);
+  for (let i = 0; i < 360; i++) {
+    let h = cfg.base + Math.sin(i * 0.025 + rand() * 6) * cfg.amp * 0.25 + Math.sin(i * 0.062 + rand() * 6) * cfg.amp * 0.12 + Math.sin(i * 0.13 + rand() * 6) * cfg.amp * 0.05;
+    for (const p of peaks) { const da = Math.min(Math.abs(i - p.az), 360 - Math.abs(i - p.az)); h += p.h * Math.exp(-(da * da) / (2 * p.w * p.w)); }
+    prof[i] = Math.max(0.15, h);
+  }
+  return prof.map((_, i) => (prof[(i - 1 + 360) % 360] + prof[i] * 2 + prof[(i + 1) % 360]) / 4);
+}
+
+const SITES = [
+  { id: 'shackleton', name: 'Shackleton Rim', program: 'Artemis', terrain: 'rim', lat: -89.90, lon: 134.0, desc: 'South-pole crater rim; Artemis III candidate with near-continuous grazing sunlight.', horizon: [ ...Array(150).fill(0), 0.2, 0.5, 0.9, 1.4, 1.8, 2.1, 2.3, 2.4, 2.4, 2.3, 2.1, 1.8, 1.4, 0.9, 0.5, 0.2, ...Array(194).fill(0) ] },
+  { id: 'malapert', name: 'Malapert Mountain', program: 'Artemis', terrain: 'peak', lat: -86.00, lon: 0.0, desc: 'Polar massif summit; one of the few south-pole points with direct Earth line-of-sight.', horizon: Array(360).fill(0) },
+  { id: 'ridge', name: 'Connecting Ridge', program: 'Artemis', terrain: 'rim', lat: -86.50, lon: 30.0, desc: 'Ridge between Shackleton and Cabeus; Artemis III primary region of interest.', horizon: [ ...Array(70).fill(0), 0.5, 1.2, 2.0, 2.5, 2.0, 1.2, 0.5, ...Array(180).fill(0), 0.4, 1.0, 1.5, 1.0, 0.4, ...Array(98).fill(0) ] },
+  { id: 'peaklight', name: 'Peak of Near-Eternal Light', program: 'Artemis', terrain: 'peak', lat: -89.45, lon: 50.0, desc: 'Putative high point near Shackleton with the highest known illumination duty cycle.', horizon: Array(360).fill(0) },
+  { id: 'haworth', name: 'Haworth Crater', program: 'CLPS', terrain: 'crater', lat: -87.40, lon: -5.0, desc: 'Permanently shadowed region near the pole; target for volatile / water-ice prospecting.', horizon: [ ...Array(90).fill(9.5), ...Array(90).fill(11.2), ...Array(90).fill(10.0), ...Array(90).fill(8.8) ] },
+  { id: 'csa_rover', name: 'CSA Lunar Rover (Cancelled)', program: 'International', terrain: 'crater', lat: -85.0, lon: 0.0, desc: 'Canadian mission designed to search for water ice at the lunar south pole. Terminated in 2026-27 plan.', horizon: [ ...Array(90).fill(5), ...Array(90).fill(7), ...Array(90).fill(4), ...Array(90).fill(6) ] },
+  { id: 'change4', name: "Chang'e 4 — Von Kármán", program: 'International', terrain: 'mare', lat: -45.50, lon: 177.6, desc: 'First far-side soft landing (2019); requires a relay satellite — no direct DTE link.', horizon: [ ...Array(180).fill(0), 0.5, 1.0, 1.2, 1.0, 0.5, ...Array(175).fill(0) ] },
+  { id: 'apollo11', name: 'Apollo 11 — Mare Tranquillitatis', program: 'Historic', terrain: 'mare', lat: 0.674, lon: 23.47, desc: 'First crewed lunar landing, 20 Jul 1969. Equatorial reference site.', horizon: Array(360).fill(0) },
+  { id: 'apollo17', name: 'Apollo 17 — Taurus-Littrow', program: 'Historic', terrain: 'mare', lat: 20.19, lon: 30.77, desc: 'Final Apollo landing, Dec 1972; discovered orange volcanic glass.', horizon: [ ...Array(20).fill(0), 2, 5, 9, 13, 16, 18, 19, 19, 18, 16, 13, 9, 5, 2, ...Array(90).fill(0), 3, 7, 12, 16, 20, 22, 23, 22, 20, 16, 12, 7, 3, ...Array(223).fill(0) ] },
+];
+
+const _customCache = {};
+function makeCustomSite(lat, lon) {
+  const key = lat.toFixed(2) + '_' + lon.toFixed(1);
+  if (_customCache[key]) return _customCache[key];
+  const absLat = Math.abs(lat);
+  const terrain = absLat > 80 ? 'rim' : (absLat > 70 ? 'crater' : 'mare');
+  const s = { id: 'custom', name: `Custom (${lat.toFixed(1)}°, ${lon.toFixed(1)}°E)`, program: 'Custom', terrain, lat, lon, desc: 'User-defined coordinates; synthetic horizon mask generated from latitude.' };
+  s.horizon = generateHorizon(s);
+  _customCache[key] = s;
+  return s;
+}
+
+/* ---------- Global State ---------- */
+const state = {
+  jd: julianDay(new Date()), baseJd: julianDay(new Date()), slipDays: 0,
+  playing: false, speed: 24, mode: 'single', persona: 'engineer',
+  siteA: 'shackleton', siteB: 'apollo11', customA: null, customB: null, arrayA: 'vertical', arrayB: 'flat',
+};
+
+function siteById(id) { return SITES.find(s => s.id === id) || SITES[0]; }
+function activeSite(slot) { const c = state['custom' + slot]; return c ? makeCustomSite(c.lat, c.lon) : siteById(slot === 'A' ? state.siteA : state.siteB); }
+function ribbonStart() { return state.jd - 0.5; }
+
+function getQuickmapUrl(site) { return `https://quickmap.lroc.asu.edu/?zoom=8&center=${site.lon},${site.lat}&proj=${site.lat < -60 ? 16 : (site.lat > 60 ? 15 : 10)}`; }
+function getHorizonsUrl(site, jd) {
+  const d = jdToDate(jd), start = d.toISOString().substring(0, 10), stop = new Date(d.getTime() + 86400000).toISOString().substring(0, 10);
+  return `https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND='10'&MAKE_EPHEM='YES'&EPHEM_TYPE='OBSERVER'&CENTER='coord@301'&COORD_TYPE='GEODETIC'&SITE_COORD='${site.lon},${site.lat},0'&START_TIME='${start}'&STOP_TIME='${stop}'&STEP_SIZE='1 h'&QUANTITIES='4'`;
+}
+
+/* ---------- 3. Topocentric & Telemetry ---------- */
+function currentBodyAltAz(site, jd, body) {
+  const target = body === 'sun' ? subsolarPoint(jd) : subearthPoint(jd);
+  return bodyAltAz(site.lat, site.lon, target.lat, target.lon);
+}
+function horizonAt(site, az) { return site.horizon[Math.round(norm360(az)) % 360]; }
+
+function findTransition(site, jd, body, rising) {
+  const stepH = 0.5, maxH = 24 * 35, limb = body === 'sun' ? SOLAR_RADIUS : 0;
+  let prev = currentBodyAltAz(site, jd, body), prevClear = prev.alt + limb - horizonAt(site, prev.az);
+  for (let h = stepH; h <= maxH; h += stepH) {
+    const cur = currentBodyAltAz(site, jd + h / 24, body), clear = cur.alt + limb - horizonAt(site, cur.az);
+    if ((rising && !prevClear <= 0 && clear > 0) || (!rising && prevClear > 0 && clear <= 0)) {
+      return h - stepH + stepH * prevClear / (prevClear - clear);
+    }
+    prevClear = clear; prev = cur;
+  }
+  return null;
+}
+
+function computeTelemetry(site, jd, arrayCfg) {
+  const sp = currentBodyAltAz(site, jd, 'sun'), ep = currentBodyAltAz(site, jd, 'earth');
+  const sunMask = horizonAt(site, sp.az), earthMask = horizonAt(site, ep.az);
+  const sunAbove = (sp.alt + SOLAR_RADIUS) > sunMask, earthAbove = ep.alt > earthMask;
+  const diskFrac = clamp((sp.alt + SOLAR_RADIUS - sunMask) / (2 * SOLAR_RADIUS), 0, 1)
+  let power = 0; const arr = arrayCfg || 'flat';
+
+  if (sunAbove) {
+    if (arr === 'flat') power = Math.max(0, Math.sin(sp.alt * DEG)) * 100 * diskFrac;
+    else if (arr === 'vertical') power = Math.max(0, Math.cos(sp.alt * DEG) * Math.cos((sp.az - (site.lat < 0 ? 0 : 180)) * DEG)) * 100 * diskFrac;
+    else if (arr === 'tracking') power = 100 * diskFrac;
+  }
+
+  return {
+    sunAlt: sp.alt, sunAz: sp.az, sunAbove, sunMask,
+    sunSet: sunAbove ? findTransition(site, jd, 'sun', false) : null,
+    sunRise: !sunAbove ? findTransition(site, jd, 'sun', true) : null,
+    earthAlt: ep.alt, earthAz: ep.az, earthAbove, earthMask,
+    earthSet: earthAbove ? findTransition(site, jd, 'earth', false) : null,
+    earthRise: !earthAbove ? findTransition(site, jd, 'earth', true) : null,
+    power, arrayCfg: arr, dte: earthAbove
+  };
+}
+
+function fmtCountdown(h) {
+  if (h === null) return null; if (h > 24 * 34.5) return '> 35d';
+  const d = Math.floor(h / 24), r = Math.round(h % 24);
+  return d >= 1 ? `${d}d ${r}h` : `${Math.max(1, Math.round(h))}h`;
+}
+
+/* ---------- 4. Rendering ---------- */
+function skyplotXY(cx, cy, R, alt, az) {
+  const a = clamp(alt, -10, 90), r = R * (1 - a / 90), ar = az * DEG;
+  return [cx + r * Math.sin(ar), cy - r * Math.cos(ar)];
+}
+
+function drawBodyPath(ctx, cx, cy, R, site, startJd, body, totalHours, stepHours, color, width, dashed) {
+  ctx.save(); ctx.beginPath(); let started = false;
+  for (let k = 0; k <= Math.floor(totalHours / stepHours); k++) {
+    const p = currentBodyAltAz(site, startJd + (k * stepHours) / 24, body);
+    if (p.alt < -10) { started = false; continue; }
+    const [x, y] = skyplotXY(cx, cy, R, p.alt, p.az);
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = color; ctx.lineWidth = width; if (dashed) ctx.setLineDash([4, 3]);
+  ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+}
+
+function drawSkyplot(canvas, site, jd) {
+  const dpr = window.devicePixelRatio || 1;
+  const cssSize = parseInt(canvas.dataset.size || '360', 10);
+  if (canvas.width !== cssSize * dpr || canvas.height !== cssSize * dpr) {
+    canvas.width = cssSize * dpr; canvas.height = cssSize * dpr;
+    canvas.style.width = cssSize + 'px'; canvas.style.height = cssSize + 'px';
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.save(); ctx.scale(dpr, dpr);
+
+  const W = cssSize, H = cssSize, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 24;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#0a0f1a'; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.fill();
+
+  // Rings & Spokes
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)'; ctx.lineWidth = 1;
+  for (const alt of [30, 60]) { ctx.beginPath(); ctx.arc(cx, cy, R * (1 - alt / 90), 0, 2 * Math.PI); ctx.stroke(); }
+  for (const az of [0, 90, 180, 270]) { ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + R * Math.sin(az * DEG), cy - R * Math.cos(az * DEG)); ctx.stroke(); }
+
+  // Trajectories
+  const polar = Math.abs(site.lat) > 70;
+  drawBodyPath(ctx, cx, cy, R, site, jd, 'sun', polar ? 168 : 48, polar ? 2 : 1, 'rgba(251, 191, 36, 0.45)', 1.5, false);
+  drawBodyPath(ctx, cx, cy, R, site, jd - 14, 'earth', 672, 12, 'rgba(56, 189, 248, 0.4)', 1.2, true);
+
+  // Horizon Mask Fill
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI, false);
+  for (let i = 360; i >= 0; i--) {
+    const alt = clamp(site.horizon[i % 360], 0, 60), r = R * (1 - alt / 90), ar = (i % 360) * DEG;
+    const x = cx + r * Math.sin(ar), y = cy - r * Math.cos(ar);
+    if (i === 360) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath(); ctx.fillStyle = 'rgba(28, 45, 74, 0.72)'; ctx.fill(); ctx.restore();
+
+  // Horizon Outline & Outer Ring
+  ctx.beginPath();
+  for (let i = 0; i <= 360; i++) {
+    const alt = clamp(site.horizon[i % 360], 0, 60), r = R * (1 - alt / 90), ar = (i % 360) * DEG;
+    if (i === 0) ctx.moveTo(cx + r * Math.sin(ar), cy - r * Math.cos(ar)); else ctx.lineTo(cx + r * Math.sin(ar), cy - r * Math.cos(ar));
+  }
+  ctx.strokeStyle = 'rgba(96, 165, 250, 0.55)'; ctx.lineWidth = 1.3; ctx.stroke();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)'; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.stroke();
+
+  // Labels
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.45)'; ctx.font = "10px 'JetBrains Mono', monospace";
+  for (const alt of [30, 60]) { ctx.fillText(alt + '°', cx + 4, cy - R * (1 - alt / 90) + 10); }
+  ctx.fillStyle = '#94a3b8'; ctx.font = "600 11px 'Inter', sans-serif"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('N', cx, cy - R - 13); ctx.fillText('S', cx, cy + R + 13); ctx.fillText('E', cx + R + 13, cy); ctx.fillText('W', cx - R - 13, cy);
+
+  // Markers
+  const sp = currentBodyAltAz(site, jd, 'sun'), ep = currentBodyAltAz(site, jd, 'earth');
+  const drawM = (p, color, radius) => {
+    if (p.alt < -12) return;
+    const [x, y] = skyplotXY(cx, cy, R, p.alt, p.az);
+    ctx.save(); ctx.beginPath(); ctx.arc(x, y, radius, 0, 2 * Math.PI);
+    if (p.alt > horizonAt(site, p.az)) {
+      ctx.shadowColor = color; ctx.shadowBlur = 10; ctx.fillStyle = color; ctx.fill(); ctx.shadowBlur = 0; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.stroke();
+    } else {
+      ctx.fillStyle = '#0d1320'; ctx.fill(); ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([2, 2]); ctx.stroke();
+    }
+    ctx.restore();
+  };
+  drawM(sp, '#fbbf24', 6.5); drawM(ep, '#38bdf8', 5.5);
+  ctx.restore();
+}
+
+const _winCache = {};
+function getCachedWindows(site, startJd, hours) {
+  const key = site.id + '|' + site.lat.toFixed(3) + '|' + site.lon.toFixed(2) + '|' + Math.floor(startJd * 24);
+  if (_winCache[key]) return _winCache[key];
+  const sun = new Array(hours), earth = new Array(hours);
+  for (let i = 0; i < hours; i++) {
+    const sp = currentBodyAltAz(site, startJd + i / 24, 'sun'), ep = currentBodyAltAz(site, startJd + i / 24, 'earth');
+    sun[i] = (sp.alt + SOLAR_RADIUS) > horizonAt(site, sp.az) ? 1 : 0; earth[i] = ep.alt > horizonAt(site, ep.az) ? 1 : 0;
+  }
+  _winCache[key] = { sun, earth };
+  if (Object.keys(_winCache).length > 80) { Object.keys(_winCache).slice(0, 25).forEach(k => delete _winCache[k]); }
+  return _winCache[key];
+}
+
+function drawRibbon(canvas, site, startJd, hours, cursorHour) {
+  const dpr = window.devicePixelRatio || 1, cssW = canvas.parentElement ? canvas.parentElement.clientWidth : 600, cssH = 56;
+  if (canvas.width !== cssW * dpr || canvas.height !== cssH * dpr) { canvas.width = cssW * dpr; canvas.height = cssH * dpr; canvas.style.width = cssW + 'px'; canvas.style.height = cssH + 'px'; }
+  const ctx = canvas.getContext('2d'); ctx.save(); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, cssW, cssH);
+
+  const padL = 70, padT = 6, plotW = Math.max(100, cssW - padL - 4), rowH = (cssH - padT - 6 - 6) / 2, colW = plotW / hours;
+  ctx.fillStyle = '#94a3b8'; ctx.font = "500 11px 'Inter', sans-serif"; ctx.textBaseline = 'middle';
+  ctx.fillText('Sunlight', 6, padT + rowH / 2); ctx.fillText('Earth Link', 6, padT + rowH + 6 + rowH / 2);
+
+  const { sun, earth } = getCachedWindows(site, startJd, hours);
+  for (let i = 0; i < hours; i++) {
+    const x = padL + i * colW, w = Math.max(colW - 0.2, 0.5);
+    ctx.fillStyle = sun[i] ? 'rgba(52, 211, 153, 0.8)' : 'rgba(255, 255, 255, 0.04)'; ctx.fillRect(x, padT, w, rowH);
+    ctx.fillStyle = earth[i] ? 'rgba(56, 189, 248, 0.8)' : 'rgba(255, 255, 255, 0.04)'; ctx.fillRect(x, padT + rowH + 6, w, rowH);
+  }
+  if (cursorHour != null && cursorHour >= 0 && cursorHour < hours) {
+    const cx = padL + cursorHour * colW + colW / 2;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(cx, 2); ctx.lineTo(cx, cssH - 2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ---------- 5. UI Layout HTML ---------- */
+function siteSelectHTML(slot) {
+  const cur = slot === 'A' ? state.siteA : state.siteB, custom = state['custom' + slot];
+  const optgroups = ['Artemis', 'CLPS', 'International', 'Historic'].map(g => 
+    `<optgroup label="${g} Sites" class="bg-card text-slate-400">` + SITES.filter(s => s.program === g).map(s => `<option value="${s.id}" ${!custom && s.id === cur ? 'selected' : ''} class="bg-card text-slate-100">${s.name}</option>`).join('') + `</optgroup>`
+  ).join('');
+  return `
+    <div class="flex items-center gap-2">
+      <select class="site-sel bg-subcard hover:bg-white/[0.04] text-slate-100 font-semibold text-base rounded-xl px-3.5 py-2 subtle-border focus:outline-none cursor-pointer" data-slot="${slot}">
+        ${optgroups}<optgroup label="User Defined" class="bg-card text-slate-400"><option value="__custom" ${custom ? 'selected' : ''} class="bg-card text-slate-100">Custom Lat / Lon Coordinates…</option></optgroup>
+      </select>
+      <span class="help-icon" data-tooltip="Choose from predefined locations derived from NASA LOLA topology, or enter custom coordinates.">?</span>
+    </div>
+  `;
+}
+
+function customRowHTML(slot) {
+  const c = state['custom' + slot]; if (!c) return '';
+  return `
+    <div class="mt-3 pt-3 subtle-border-t flex flex-wrap items-center gap-3 text-xs">
+      <span class="text-slate-400">Custom Coordinates:</span>
+      <div class="flex items-center gap-1.5 text-slate-300">
+        <span>Lat</span>
+        <input type="number" class="cust-lat w-20 bg-subcard text-white font-mono text-xs px-2.5 py-1 rounded-lg subtle-border focus:outline-none" data-slot="${slot}" value="${c.lat}" step="0.1" min="-90" max="90">
+        <span class="text-slate-500">°</span>
+      </div>
+      <div class="flex items-center gap-1.5 text-slate-300 ml-4">
+        <span>Lon</span>
+        <input type="number" class="cust-lon w-20 bg-subcard text-white font-mono text-xs px-2.5 py-1 rounded-lg subtle-border focus:outline-none" data-slot="${slot}" value="${c.lon}" step="0.5" min="-180" max="180">
+        <span class="text-slate-500">°E</span>
+      </div>
+    </div>`;
+}
+
+function statusCardsHTML(t, site, slot, persona) {
+  const arr = t.arrayCfg, isPolar = Math.abs(site.lat) > 70;
+  const arrayNote = isPolar ? `At ${Math.abs(site.lat).toFixed(1)}° latitude, the Sun skims the horizon. Vertical panels capture far more power.` : `At ${Math.abs(site.lat).toFixed(1)}° latitude, the Sun climbs overhead.`;
+  const pillCls = (type) => arr === type ? 'px-2 py-0.5 rounded text-[11px] font-medium bg-white/10 text-white' : 'px-2 py-0.5 rounded text-[11px] font-medium text-slate-400 hover:text-slate-200';
+
+  const arrayToggleHtml = `
+    <div class="flex items-center gap-1">
+      <div class="inline-flex items-center bg-card p-0.5 rounded-lg subtle-border array-seg" data-slot="${slot}">
+        <button data-array="flat" class="${pillCls('flat')}">Flat</button>
+        <button data-array="vertical" class="${pillCls('vertical')}">Vertical</button>
+        <button data-array="tracking" class="${pillCls('tracking')}">Tracking</button>
+      </div>
+    </div>`;
+
+  if (persona === 'explorer') {
+    // EXPLORER MODE
+    const sunBadge = t.sunAbove ? `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-300">SUNLIT</span>` : `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-rose-500/15 text-rose-300">SHADOW</span>`;
+    const earthBadge = t.earthAbove ? `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-sky-500/15 text-sky-300">DTE LINK ACTIVE</span>` : `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-300">BLOCKED</span>`;
+    
+    return `
+      <div class="space-y-3.5">
+        <div class="p-4 rounded-xl bg-subcard subtle-border flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center text-xs font-medium text-slate-400">
+              Solar Conditions <span class="help-icon tip-right" data-tooltip="Plain-english summary of solar geometry and lighting.">?</span>
+            </div>
+            ${sunBadge}
+          </div>
+          <div class="text-[13px] text-slate-300 leading-relaxed">
+            ${t.sunAbove 
+              ? `<span class="text-amber-400 text-lg align-middle mr-1">☀</span> The Sun is skimming above the terrain at <b>${t.sunAlt.toFixed(1)}°</b>. ${t.sunSet === null ? 'It will remain visible all month, providing continuous power.' : `Shadows will fall across the site in roughly <b>${fmtCountdown(t.sunSet)}</b>.`}` 
+              : `<span class="text-slate-500 text-lg align-middle mr-1">☾</span> The site is in lunar night, with the Sun <b>${Math.abs(t.sunAlt).toFixed(1)}°</b> below the local ridge. ${t.sunRise === null ? 'It will not rise this month.' : `Sunlight returns in <b>${fmtCountdown(t.sunRise)}</b>.`}`}
+          </div>
+        </div>
+        <div class="p-4 rounded-xl bg-subcard subtle-border flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center text-xs font-medium text-slate-400">
+              Earth Contact <span class="help-icon tip-right" data-tooltip="Plain-english summary of Direct-to-Earth (DTE) radio links.">?</span>
+            </div>
+            ${earthBadge}
+          </div>
+          <div class="text-[13px] text-slate-300 leading-relaxed">
+            ${t.earthAbove 
+              ? `<span class="text-sky-400 text-lg align-middle mr-1">🌍</span> Earth is visible in the sky at <b>${t.earthAlt.toFixed(1)}°</b>. ${t.earthSet === null ? 'You have a permanent, unbroken communication link home.' : `Earth will dip below the horizon in <b>${fmtCountdown(t.earthSet)}</b> due to optical libration.`}` 
+              : `<span class="text-amber-500 text-lg align-middle mr-1">🌍</span> Earth is blocked by the local horizon. ${t.earthRise === null ? 'A relay satellite is strictly required for this location.' : `Direct line-of-sight is restored in <b>${fmtCountdown(t.earthRise)}</b>.`}`}
+          </div>
+        </div>
+        <div class="p-4 rounded-xl bg-subcard subtle-border flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center text-xs font-medium text-slate-400">
+              Array Efficiency <span class="help-icon tip-right" data-tooltip="How much power your panels generate based on angle.">?</span>
+            </div>
+            ${arrayToggleHtml}
+          </div>
+          <div class="text-[13px] text-slate-300 leading-relaxed">
+            <span class="text-emerald-400 text-lg align-middle mr-1">⚡</span> ${t.sunAbove ? `Your chosen array configuration is producing <b>${t.power.toFixed(0)}%</b> of its maximum potential output. ${arrayNote}` : `The array is producing <b>0%</b> output because the site is shadowed by the surrounding terrain. Landers must rely on batteries.`}
+          </div>
+        </div>
+      </div>`;
+  } else {
+    // ENGINEER MODE
+    const sunBadge = t.sunAbove ? `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-300">SUNLIT</span>` : `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-rose-500/15 text-rose-300">IN SHADOW</span>`;
+    const earthBadge = t.earthAbove ? `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-sky-500/15 text-sky-300">LINK ACTIVE</span>` : `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-300">BLOCKED</span>`;
+    
+    return `
+      <div class="space-y-3.5">
+        <div class="p-4 rounded-xl bg-subcard subtle-border flex flex-col justify-between gap-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center text-xs font-medium text-slate-400">
+              Sunlight Status <span class="help-icon tip-right" data-tooltip="Geometry of the Sun relative to the local horizon">?</span>
+            </div>
+            ${sunBadge}
+          </div>
+          <div class="flex items-baseline justify-between my-0.5">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl font-semibold font-mono text-slate-100">${t.sunAlt.toFixed(1)}°</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-medium text-slate-300">${t.sunAbove ? (t.sunSet===null?'Continuous Day':`Sets in ${fmtCountdown(t.sunSet)}`) : (t.sunRise===null?'Polar Night':`Rises in ${fmtCountdown(t.sunRise)}`)}</span>
+            </div>
+          </div>
+          <div class="text-[11px] text-slate-500 font-mono flex gap-2">
+            <span>Azimuth ${t.sunAz.toFixed(0)}°</span> ·
+            <span>Mask ${t.sunMask.toFixed(1)}°</span>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-subcard subtle-border flex flex-col justify-between gap-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center text-xs font-medium text-slate-400">
+              Earth Comms (DTE) <span class="help-icon tip-right" data-tooltip="Line-of-sight availability to Earth">?</span>
+            </div>
+            ${earthBadge}
+          </div>
+          <div class="flex items-baseline justify-between my-0.5">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl font-semibold font-mono text-slate-100">${t.earthAlt.toFixed(1)}°</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-medium text-slate-300">${t.earthAbove ? (t.earthSet===null?'Continuous DTE':`Earthset in ${fmtCountdown(t.earthSet)}`) : (t.earthRise===null?'No Direct Link':`Earthrise in ${fmtCountdown(t.earthRise)}`)}</span>
+            </div>
+          </div>
+          <div class="text-[11px] text-slate-500 font-mono flex gap-2">
+            <span>Azimuth ${t.earthAz.toFixed(0)}°</span> ·
+            <span>Mask ${t.earthMask.toFixed(1)}°</span>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-subcard subtle-border flex flex-col justify-between gap-2.5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center text-xs font-medium text-slate-400">
+              Solar Yield <span class="help-icon tip-right" data-tooltip="Power generation efficiency based on array type">?</span>
+            </div>
+            ${arrayToggleHtml}
+          </div>
+          <div class="flex items-baseline justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl font-semibold font-mono ${t.power > 0 ? 'text-emerald-400' : 'text-slate-500'}">${t.power.toFixed(0)}%</span>
+            </div>
+            <span class="text-xs text-slate-400">${t.sunAbove ? 'Of rated capacity' : 'In lunar shadow'}</span>
+          </div>
+          <p class="text-[11px] text-slate-500 leading-relaxed">${arrayNote}</p>
+        </div>
+      </div>`;
+  }
+}
+
+function buildPanel(slot) {
+  const site = activeSite(slot), isSingle = state.mode === 'single', skySize = isSingle ? 360 : 310, latStr = site.lat < 0 ? `${Math.abs(site.lat).toFixed(2)}°S` : `${site.lat.toFixed(2)}°N`;
+  return `
+    <section class="bg-card rounded-2xl subtle-border p-5 md:p-6 flex flex-col justify-between space-y-6" data-slot="${slot}">
+      <div>
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3">${!isSingle ? `<span class="text-xs font-mono font-semibold text-slate-400">SITE ${slot}</span>` : ''}${siteSelectHTML(slot)}</div>
+          <div class="flex items-center gap-2">
+            <div class="text-[11px] font-mono text-slate-400 bg-subcard px-3 py-1.5 rounded-lg subtle-border site-meta-pill">${latStr}, ${site.lon.toFixed(1)}°E · ${site.program}</div>
+          </div>
+        </div>
+        <p class="text-xs text-slate-400 mt-2.5 site-desc-lbl">${site.desc}</p>
+        ${customRowHTML(slot)}
+      </div>
+      <div class="grid grid-cols-1 ${isSingle ? 'lg:grid-cols-12' : ''} gap-6 items-center">
+        <div class="${isSingle ? 'lg:col-span-6' : ''} flex flex-col items-center justify-center bg-subcard rounded-xl p-4 subtle-border">
+          <div class="flex w-full justify-end mb-2">
+            <span class="help-icon tip-left tip-down" data-tooltip="Polar Skyplot: Overhead dome view. Center = Zenith, Outer Edge = 0° horizon. The blue rim is local terrain.">?</span>
+          </div>
+          <canvas class="sky" data-size="${skySize}"></canvas>
+          <div class="mt-3 flex items-center gap-5 text-xs text-slate-400">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block shadow-[0_0_8px_#fbbf24]"></span>Sun</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block shadow-[0_0_8px_#38bdf8]"></span>Earth</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-2 rounded-sm bg-sky-900/80 border border-sky-400/60 inline-block"></span>Horizon</span>
+          </div>
+        </div>
+        <div class="${isSingle ? 'lg:col-span-6' : ''} telem-host"></div>
+      </div>
+      <div class="pt-2 subtle-border-t">
+        <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+          <div class="flex items-center gap-2">
+            <span class="font-medium text-slate-300">30-Day Forecast Window</span>
+            <span class="help-icon tip-right" data-tooltip="Timeline showing Sunlight (green) and Earth Comm (blue) visibility over the upcoming lunar month.">?</span>
+          </div>
+          <div class="flex items-center gap-2 hidden sm:flex">
+            <span class="text-[11px] text-slate-500">Click timeline to jump to date</span>
+          </div>
+        </div>
+        <canvas class="ribbon w-full rounded-xl bg-subcard subtle-border cursor-pointer" data-slot="${slot}" height="56"></canvas>
+        <div class="flex justify-between font-mono text-[10px] text-slate-500 mt-1.5 pl-[70px]"><span>Now</span><span>+7d</span><span>+15d</span><span>+22d</span><span>+30d</span></div>
+      </div>
+    </section>`;
+}
+
+/* ---------- Scorecard (Compare Mode) ---------- */
+function fmtRun(h) { if (h >= 24 * 30) return '30d+'; const d = Math.floor(h / 24), r = Math.round(h % 24); return d >= 1 ? `${d}d ${r}h` : `${Math.round(h)}h`; }
+function scorecardMetrics(site, startJd) {
+  const hours = 24 * 30, { sun, earth } = getCachedWindows(site, startJd, hours);
+  let maxAlt = -90; for (let i = 0; i < hours; i += 2) { const sp = currentBodyAltAz(site, startJd + i / 24, 'sun'); if (sp.alt > maxAlt) maxAlt = sp.alt; }
+  const lr = (arr) => { let b = 0, c = 0; for(let v of arr){ if(v){c++;if(c>b)b=c;}else c=0;} return b; };
+  return { maxSunRun: lr(sun), maxDarkRun: lr(sun.map(v => 1 - v)), maxCommsBlackout: lr(earth.map(v => 1 - v)), avgDailyComms: earth.reduce((a, b) => a + b, 0) / 30, maxAlt };
+}
+
+function buildLayout() {
+  const root = document.getElementById('root');
+  const compSection = state.mode === 'split' ? `
+    <section class="bg-card rounded-2xl subtle-border p-6 mt-6">
+      <div class="flex items-center gap-2 mb-4">
+        <h2 class="text-sm font-semibold text-slate-200">30-Day Comparison Summary</h2>
+      </div>
+      <div id="scorebody"></div>
+    </section>` : '';
+  
+  root.innerHTML = `<div class="${state.mode === 'split' ? 'grid grid-cols-1 lg:grid-cols-2 gap-6' : 'grid grid-cols-1 gap-6'}">${buildPanel('A')}${state.mode === 'split' ? buildPanel('B') : ''}</div>` + compSection;
+  
+  document.querySelectorAll('canvas.ribbon').forEach(canvas => {
+    let dragging = false;
+    const scrub = (clientX) => {
+      const rect = canvas.getBoundingClientRect(), padL = 70, plotW = Math.max(100, rect.width - padL - 4);
+      const hr = Math.floor((clamp(clientX - rect.left - padL, 0, plotW) / plotW) * (24 * 30));
+      state.jd = ribbonStart() + hr / 24; state.baseJd = state.jd - state.slipDays; state.playing = false; updatePlayBtn(); refreshAll(); pushUrl();
+    };
+    canvas.addEventListener('mousedown', e => { dragging = true; scrub(e.clientX); });
+    window.addEventListener('mousemove', e => { if (dragging) scrub(e.clientX); });
+    window.addEventListener('mouseup', () => dragging = false);
+    canvas.addEventListener('touchstart', e => { if (e.touches.length) scrub(e.touches[0].clientX); }, { passive: true });
+  });
+}
+
+function renderScorecard() {
+  const body = document.getElementById('scorebody'); if (!body) return;
+  const sa = activeSite('A'), sb = activeSite('B'), a = scorecardMetrics(sa, ribbonStart()), b = scorecardMetrics(sb, ribbonStart());
+  const sn = s => s.name.split('—')[0].trim();
+  body.innerHTML = `
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead><tr class="subtle-border-b text-slate-400"><th class="py-2.5 pr-4 font-medium">Metric</th><th class="py-2.5 px-4 font-medium text-slate-200">Site A — ${sn(sa)}</th><th class="py-2.5 pl-4 font-medium text-slate-200">Site B — ${sn(sb)}</th></tr></thead>
+        <tbody class="divide-y divide-white/[0.05] font-mono text-slate-200">
+          <tr>
+            <td class="py-2.5 pr-4 font-sans text-slate-400 flex items-center justify-between">Max continuous sunlight</td>
+            <td class="py-2.5 px-4">${fmtRun(a.maxSunRun)}</td><td class="py-2.5 pl-4">${fmtRun(b.maxSunRun)}</td>
+          </tr>
+          <tr>
+            <td class="py-2.5 pr-4 font-sans text-slate-400 flex items-center justify-between">Max continuous darkness</td>
+            <td class="py-2.5 px-4">${fmtRun(a.maxDarkRun)}</td><td class="py-2.5 pl-4">${fmtRun(b.maxDarkRun)}</td>
+          </tr>
+          <tr>
+            <td class="py-2.5 pr-4 font-sans text-slate-400 flex items-center justify-between">Peak solar elevation</td>
+            <td class="py-2.5 px-4">${a.maxAlt.toFixed(1)}°</td><td class="py-2.5 pl-4">${b.maxAlt.toFixed(1)}°</td>
+          </tr>
+          <tr>
+            <td class="py-2.5 pr-4 font-sans text-slate-400 flex items-center justify-between">Longest Earth blackout</td>
+            <td class="py-2.5 px-4">${fmtRun(a.maxCommsBlackout)}</td><td class="py-2.5 pl-4">${fmtRun(b.maxCommsBlackout)}</td>
+          </tr>
+          <tr>
+            <td class="py-2.5 pr-4 font-sans text-slate-400 flex items-center justify-between">Avg daily Earth comms</td>
+            <td class="py-2.5 px-4">${a.avgDailyComms.toFixed(1)} h/day</td><td class="py-2.5 pl-4">${b.avgDailyComms.toFixed(1)} h/day</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+
+/* ---------- 6. Refresh & State Sync ---------- */
+function fmtDatetimeLocal(d) { const p = n => String(n).padStart(2, '0'); return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) + 'T' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()); }
+
+function refreshAll() {
+  if (document.activeElement !== document.getElementById('dt')) document.getElementById('dt').value = fmtDatetimeLocal(jdToDate(state.baseJd));
+  const effLbl = document.getElementById('effectiveDtLbl'), slipBadge = document.getElementById('slipActiveBadge');
+  if (state.slipDays === 0) { if (effLbl) effLbl.textContent = 'No delay'; if (slipBadge) slipBadge.classList.add('hidden'); }
+  else { if (effLbl) effLbl.textContent = `+${state.slipDays}d → ${fmtDatetimeLocal(jdToDate(state.jd)).replace('T', ' ')}`; if (slipBadge) { slipBadge.textContent = `Slip +${state.slipDays}d`; slipBadge.classList.remove('hidden'); } }
+
+  const primarySite = activeSite('A');
+  document.getElementById('globalQmLink').href = getQuickmapUrl(primarySite); document.getElementById('globalJplLink').href = getHorizonsUrl(primarySite, state.jd);
+
+  const cmpBtn = document.getElementById('compareBtn');
+  if (cmpBtn) cmpBtn.className = state.mode === 'split' ? 'px-3.5 py-2 md:py-1.5 rounded-xl text-xs font-medium bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-2' : 'px-3.5 py-2 md:py-1.5 rounded-xl text-xs font-medium bg-card hover:bg-white/[0.06] text-slate-300 subtle-border transition-colors flex items-center gap-2';
+
+  document.querySelectorAll('#personaToggle button').forEach(b => b.className = b.dataset.persona === state.persona ? 'px-3 py-1.5 text-xs rounded-lg font-medium bg-white/[0.12] text-slate-100 transition-colors' : 'px-3 py-1.5 text-xs rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-colors');
+
+  document.querySelectorAll('section[data-slot]').forEach(panel => {
+    const slot = panel.dataset.slot, site = activeSite(slot);
+    const metaPill = panel.querySelector('.site-meta-pill'); 
+    if (metaPill) metaPill.innerHTML = `${site.lat < 0 ? `${Math.abs(site.lat).toFixed(2)}°S` : `${site.lat.toFixed(2)}°N`}, ${site.lon.toFixed(1)}°E · ${site.program}`;
+    const skyCanv = panel.querySelector('canvas.sky'); skyCanv.dataset.size = String(Math.max(240, Math.min(window.innerWidth - 80, state.mode === 'single' ? 360 : 310)));
+    drawSkyplot(skyCanv, site, state.jd);
+    panel.querySelector('.telem-host').innerHTML = statusCardsHTML(computeTelemetry(site, state.jd, state['array' + slot]), site, slot, state.persona);
+    drawRibbon(panel.querySelector('canvas.ribbon'), site, ribbonStart(), 24 * 30, 12);
+  });
+  if (state.mode === 'split') renderScorecard();
+}
+
+/* ---------- 7. Controls & Loop ---------- */
+function togglePlay() { state.playing = !state.playing; updatePlayBtn(); if (state.playing) { lastTickMs = null; requestAnimationFrame(tick); } }
+function updatePlayBtn() { const b = document.getElementById('playBtn'); b.textContent = state.playing ? '❚❚ Pause' : '▶ Play'; b.className = state.playing ? 'px-3 py-1 rounded-lg text-xs font-medium bg-sky-500/20 text-sky-300 transition-colors min-w-[72px] text-center' : 'px-3 py-1 rounded-lg text-xs font-medium bg-white/[0.06] hover:bg-white/[0.12] text-slate-100 transition-colors min-w-[72px] text-center'; }
+
+function updateSlip(days) {
+  state.slipDays = days; state.jd = state.baseJd + state.slipDays; document.getElementById('slipSlider').value = days;
+  document.querySelectorAll('#slipSeg button').forEach(b => b.className = +b.dataset.slip === days ? 'px-2 py-0.5 rounded text-[11px] font-mono bg-white/10 text-white' : 'px-2 py-0.5 rounded text-[11px] font-mono text-slate-400 hover:text-slate-200');
+  refreshAll(); pushUrl();
+}
+
+let lastTickMs = null, lastRefreshMs = 0, lastUrlMs = 0;
+function tick(now) {
+  if (!state.playing) return;
+  if (lastTickMs == null) lastTickMs = now; state.baseJd += (state.speed * (now - lastTickMs) / 1000) / 24; state.jd = state.baseJd + state.slipDays; lastTickMs = now;
+  if (now - lastRefreshMs > 90) { refreshAll(); lastRefreshMs = now; }
+  if (now - lastUrlMs > 1000) { pushUrl(); lastUrlMs = now; }
+  requestAnimationFrame(tick);
+}
+
+function pushUrl() {
+  const p = new URLSearchParams(); p.set('t', jdToDate(state.baseJd).toISOString());
+  if (state.slipDays > 0) p.set('slip', state.slipDays);
+  p.set('mode', state.mode); p.set('persona', state.persona); p.set('speed', state.speed);
+  p.set('a', state.customA ? state.customA.lat.toFixed(2) + ',' + state.customA.lon.toFixed(1) : state.siteA);
+  p.set('b', state.customB ? state.customB.lat.toFixed(2) + ',' + state.customB.lon.toFixed(1) : state.siteB);
+  if (state.arrayA !== 'flat') p.set('arrA', state.arrayA); if (state.arrayB !== 'flat') p.set('arrB', state.arrayB);
+  try { history.replaceState(null, '', location.pathname + '?' + p.toString()); } catch (e) {}
+}
+
+function loadFromUrl() {
+  const p = new URLSearchParams(location.search);
+  if (p.get('t') && !isNaN(new Date(p.get('t')))) state.baseJd = julianDay(new Date(p.get('t')));
+  if (p.get('slip')) state.slipDays = +p.get('slip'); state.jd = state.baseJd + state.slipDays;
+  if (p.get('mode')) state.mode = p.get('mode'); if (p.get('persona')) state.persona = p.get('persona'); if (p.get('speed')) state.speed = +p.get('speed');
+  if (p.get('arrA')) state.arrayA = p.get('arrA'); if (p.get('arrB')) state.arrayB = p.get('arrB');
+  const parse = (val, slot) => { if (!val) return; if (val.includes(',')) { const a = val.split(',').map(Number); state['custom' + slot] = { lat: a[0], lon: a[1] }; } else { state['custom' + slot] = null; state['site' + slot.toUpperCase()] = val; } };
+  parse(p.get('a'), 'A'); parse(p.get('b'), 'B');
+}
+
+function wireGlobal() {
+  document.getElementById('dt').addEventListener('input', e => { const d = new Date(e.target.value + 'Z'); if (!isNaN(d)) { state.baseJd = julianDay(d); state.jd = state.baseJd + state.slipDays; state.playing = false; updatePlayBtn(); refreshAll(); pushUrl(); } });
+  document.getElementById('nowBtn').addEventListener('click', () => { state.baseJd = julianDay(new Date()); state.jd = state.baseJd + state.slipDays; state.playing = false; updatePlayBtn(); refreshAll(); pushUrl(); });
+  document.getElementById('playBtn').addEventListener('click', togglePlay);
+  document.getElementById('speedSelect').addEventListener('change', e => { state.speed = +e.target.value; pushUrl(); });
+  
+  document.getElementById('personaToggle').addEventListener('click', e => {
+    const b = e.target.closest('button[data-persona]');
+    if (b) { state.persona = b.dataset.persona; refreshAll(); pushUrl(); }
+  });
+
+  document.getElementById('compareBtn').addEventListener('click', () => { state.mode = state.mode === 'single' ? 'split' : 'single'; buildLayout(); refreshAll(); pushUrl(); });
+  document.getElementById('shareBtn').addEventListener('click', () => {
+    pushUrl(); const url = location.href, btn = document.getElementById('shareBtn');
+    try { const temp = document.createElement('textarea'); temp.value = url; document.body.appendChild(temp); temp.select(); document.execCommand('copy'); document.body.removeChild(temp); btn.textContent = '✓ Copied'; }
+    catch (e) { if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => btn.textContent = '✓ Copied'); }
+    setTimeout(() => { btn.textContent = 'Share'; }, 1500);
+  });
+
+  document.getElementById('slipSlider').addEventListener('input', e => updateSlip(+e.target.value));
+  document.getElementById('slipSeg').addEventListener('click', e => { const b = e.target.closest('button[data-slip]'); if (b) updateSlip(+b.dataset.slip); });
+
+  document.addEventListener('keydown', e => { if (e.code === 'Space' && !['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(e.target.tagName)) { e.preventDefault(); togglePlay(); } });
+
+  const root = document.getElementById('root');
+  root.addEventListener('click', e => {
+    const arrBtn = e.target.closest('.array-seg button');
+    if (arrBtn) { state['array' + arrBtn.closest('.array-seg').dataset.slot] = arrBtn.dataset.array; refreshAll(); pushUrl(); }
+  });
+
+  root.addEventListener('change', e => {
+    if (e.target.classList.contains('site-sel')) {
+      const slot = e.target.dataset.slot;
+      if (e.target.value === '__custom') state['custom' + slot] = { lat: activeSite(slot).lat, lon: activeSite(slot).lon }; else { state['custom' + slot] = null; state['site' + slot.toUpperCase()] = e.target.value; }
+      buildLayout(); refreshAll(); pushUrl();
+    }
+  });
+
+  root.addEventListener('input', e => {
+    if (e.target.classList.contains('cust-lat') || e.target.classList.contains('cust-lon')) {
+      const slot = e.target.dataset.slot, panel = e.target.closest('section[data-slot]');
+      state['custom' + slot] = { lat: clamp(+panel.querySelector(`.cust-lat[data-slot="${slot}"]`).value || 0, -90, 90), lon: clamp(+panel.querySelector(`.cust-lon[data-slot="${slot}"]`).value || 0, -180, 180) };
+      refreshAll(); pushUrl();
+    }
+  });
+}
+
+let resizeTimer; window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { refreshAll(); }, 150); });
+
+function init() {
+  loadFromUrl(); document.getElementById('dt').value = fmtDatetimeLocal(jdToDate(state.baseJd));
+  document.getElementById('speedSelect').value = String(state.speed); updateSlip(state.slipDays);
+  wireGlobal(); buildLayout(); refreshAll();
+}
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
